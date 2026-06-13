@@ -1,0 +1,10 @@
+[package]
+name = "swaggy"
+version = "0.2.4"
+authors = ["Julian Siebert <mail@julian-siebert.de>"]
+edition = "2024"
+description = ""
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["grpc", "protobuf", "rpc"]
+categories = ["accessibility", "command-line-utilities", "development-tools"]

@@ -1,0 +1,67 @@
+name: "Setup swaggy"
+description: "Install the swaggy CLI from pkgs.julian-siebert.de"
+author: "Julian Siebert"
+branding:
+  icon: "package"
+  color: "purple"
+
+inputs:
+  version:
+    description: 'Version of swaggy to install (e.g. "0.1.0", or "latest")'
+    required: false
+    default: "latest"
+  install-dir:
+    description: "Directory to install swaggy into"
+    required: false
+    default: ""
+
+outputs:
+  version:
+    description: "The resolved version of swaggy that was installed"
+    value: ${{ steps.install.outputs.version }}
+  path:
+    description: "Absolute path to the installed swaggy binary"
+    value: ${{ steps.install.outputs.path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install swaggy
+      id: install
+      shell: bash
+      env:
+        SWAGGY_VERSION: ${{ inputs.version }}
+        SWAGGY_INSTALL_DIR: ${{ inputs.install-dir }}
+        SWAGGY_NO_MODIFY_PATH: "1"
+      run: |
+        set -euo pipefail
+
+        if [ -z "${SWAGGY_INSTALL_DIR:-}" ]; then
+          SWAGGY_INSTALL_DIR="$RUNNER_TEMP/swaggy-bin"
+        fi
+        export SWAGGY_INSTALL_DIR
+
+        if [ "$SWAGGY_VERSION" = "latest" ]; then
+          echo "::group::Install swaggy (latest)"
+        else
+          echo "::group::Install swaggy v${SWAGGY_VERSION}"
+        fi
+        curl --proto '=https' --tlsv1.2 -sSL \
+          https://pkgs.julian-siebert.de/swaggy/install.sh | sh
+        echo "::endgroup::"
+
+        echo "$SWAGGY_INSTALL_DIR" >> "$GITHUB_PATH"
+
+        if [ -x "$SWAGGY_INSTALL_DIR/swaggy.exe" ]; then
+          binary_path="$SWAGGY_INSTALL_DIR/swaggy.exe"
+        elif [ -x "$SWAGGY_INSTALL_DIR/swaggy" ]; then
+          binary_path="$SWAGGY_INSTALL_DIR/swaggy"
+        else
+          echo "::error::swaggy binary not found in $SWAGGY_INSTALL_DIR"
+          exit 1
+        fi
+
+        installed_version=$("$binary_path" --version | awk '{print $NF}')
+        echo "version=$installed_version" >> "$GITHUB_OUTPUT"
+        echo "path=$binary_path" >> "$GITHUB_OUTPUT"
+        echo "::notice::Installed swaggy $installed_version at $binary_path"

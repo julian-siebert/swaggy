@@ -1,0 +1,104 @@
+name: Test action
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "action.yml"
+      - ".github/workflows/test-action.yml"
+  pull_request:
+    paths:
+      - "action.yml"
+      - ".github/workflows/test-action.yml"
+  schedule:
+    # Daily at 06:00 UTC — catches breakage from infra changes
+    # (e.g. pkgs.julian-siebert.de outage, install.sh regression)
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Swaggy version to test against (default: latest)"
+        required: false
+        default: "latest"
+
+concurrency:
+  group: test-action-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test-default:
+    name: Default install on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install swaggy via action
+        id: setup
+        uses: ./
+        with:
+          version: ${{ inputs.version || 'latest' }}
+
+      - name: Verify outputs are populated
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${{ steps.setup.outputs.version }}" ]; then
+            echo "::error::version output is empty"
+            exit 1
+          fi
+          if [ -z "${{ steps.setup.outputs.path }}" ]; then
+            echo "::error::path output is empty"
+            exit 1
+          fi
+          echo "Installed version: ${{ steps.setup.outputs.version }}"
+          echo "Binary path:       ${{ steps.setup.outputs.path }}"
+
+      - name: Verify swaggy is on PATH
+        shell: bash
+        run: |
+          which swaggy || command -v swaggy
+          swaggy --version
+
+      - name: Verify reported version matches output
+        shell: bash
+        run: |
+          actual=$(swaggy --version | awk '{print $NF}')
+          expected="${{ steps.setup.outputs.version }}"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::version mismatch: PATH binary says '$actual', action output says '$expected'"
+            exit 1
+          fi
+
+  test-custom-install-dir:
+    name: Custom install-dir
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install to custom directory
+        id: setup
+        uses: ./
+        with:
+          install-dir: ${{ github.workspace }}/custom-bin
+
+      - name: Verify binary is in expected location
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.workspace }}/custom-bin/swaggy"
+          if [ ! -x "$expected" ]; then
+            echo "::error::binary not found at $expected"
+            ls -la "${{ github.workspace }}/custom-bin/" || true
+            exit 1
+          fi
+          echo "::notice::binary correctly placed at $expected"
+
+      - name: Verify it works
+        run: swaggy --version

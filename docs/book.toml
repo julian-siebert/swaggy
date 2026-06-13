@@ -1,0 +1,9 @@
+[book]
+title = "The Swaggy Book"
+authors = ["Julian Siebert"]
+language = "en"
+
+[output.html]
+git-repository-url = "https://github.com/julian-siebert/swaggy"
+edit-url-template = "https://github.com/julian-siebert/swaggy/edit/main/docs/{path}"
+site-url = "/swaggy/"
